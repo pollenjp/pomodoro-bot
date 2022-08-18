@@ -153,7 +153,9 @@ func (p *Pomodoro) Stop() {
 
 	p.unDeafenAllMembers()
 
-	msg := "Pomodoro was stopped!" + "\n" + "If you want to get out from pomodoro vc channel when tasking, move to another channel from pomodoro voice channel."
+	msg := "Pomodoro is over!\n"
+	msg += "If you want to get out from the pomodoro VC while tasking and deaf, move to another VC from pomodoro's.\n"
+	msg += "Bot can un-deafen a user only in some VC."
 	log.Print(msg)
 	if _, err := p.session.ChannelMessageSend(p.textChannelID, msg); err != nil {
 		log.Printf("Error sending message: %v", err)
@@ -162,6 +164,18 @@ func (p *Pomodoro) Stop() {
 
 func (p *Pomodoro) AddMember(user discordgo.User) {
 	p.members[user.ID] = user
+
+	msg := "Welcome <@" + user.ID + "> !"
+	switch p.status {
+	case PomodoroStatusTask:
+		msg += "Tasking now!"
+	case PomodoroStatusBreakTime:
+		msg += "Breaking now!"
+	}
+	if _, err := p.session.ChannelMessageSend(p.textChannelID, msg); err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
+
 }
 
 func (p *Pomodoro) AddMemberWithServerMute(user discordgo.User, session *discordgo.Session, guildID GuildID) {
