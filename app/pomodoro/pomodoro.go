@@ -1,6 +1,7 @@
 package pomodoro
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -104,6 +105,11 @@ func (p *Pomodoro) Task() {
 	)
 
 	msg := "Pomodoro task has started!"
+	msg += "\n"
+	msg += fmt.Sprintf("Task time ends in %d minutes.", PomodoroTaskMinutes)
+	msg += "\n"
+	t := time.Now().Add(PomodoroBreakMinutes * time.Minute)
+	msg += fmt.Sprintf("Task time ends at %s.", t.Format("2006/01/02")+" "+t.Format("15:04"))
 	log.Print(msg)
 	p.messageWithAllMembersMention(msg)
 	p.deafenAllMembers()
@@ -137,6 +143,11 @@ func (p *Pomodoro) Break() {
 	)
 
 	msg := "Pomodoro break time has started!"
+	msg += "\n"
+	msg += fmt.Sprintf("Break time ends in %d minutes.", PomodoroBreakMinutes)
+	msg += "\n"
+	t := time.Now().Add(PomodoroBreakMinutes * time.Minute)
+	msg += fmt.Sprintf("Break time ends at %s.", t.Format("2006/01/02")+" "+t.Format("15:04"))
 	log.Print(msg)
 	p.messageWithAllMembersMention(msg)
 	p.deafenAllMembers()
