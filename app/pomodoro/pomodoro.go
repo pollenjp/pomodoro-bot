@@ -29,7 +29,7 @@ type Pomodoro struct {
 	guildID       ChannelID
 	textChannelID ChannelID
 	// Joining users
-	members         map[UserID]bool
+	members         map[UserID]discordgo.User
 	status          PomodoroStatus `default:"PomodoroStatusStop"`
 	timer           *time.Timer
 	taskEndTimerCh  chan struct{}
@@ -43,7 +43,8 @@ func NewPomodoro(session *discordgo.Session, guildID ChannelID, textChannelID Ch
 		session:       session,
 		guildID:       guildID,
 		textChannelID: textChannelID,
-		members:       make(map[UserID]bool),
+		members:       make(map[UserID]discordgo.User),
+		status:        PomodoroStatusStop,
 	}
 
 }
@@ -102,13 +103,21 @@ func (p *Pomodoro) Task() {
 		},
 	)
 
-	msg := "Pomodoro task was started now!"
+	msg := "Pomodoro task has started!"
 	log.Print(msg)
+	p.messageWithAllMembersMention(msg)
+	p.deafenAllMembers()
+}
+
+func (p *Pomodoro) messageWithAllMembersMention(msg string) {
+	mention := ""
+	for _, user := range p.members {
+		mention += "<@" + user.ID + "> "
+	}
+	msg = mention + "\n" + msg
 	if _, err := p.session.ChannelMessageSend(p.textChannelID, msg); err != nil {
 		log.Printf("Error sending message: %v", err)
 	}
-
-	p.deafenAllMembers()
 }
 
 func (p *Pomodoro) Break() {
@@ -127,12 +136,10 @@ func (p *Pomodoro) Break() {
 		},
 	)
 
-	msg := "Pomodoro break time was started now!"
+	msg := "Pomodoro break time has started!"
 	log.Print(msg)
-	if _, err := p.session.ChannelMessageSend(p.textChannelID, msg); err != nil {
-		log.Printf("Error sending message: %v", err)
-	}
-
+	p.messageWithAllMembersMention(msg)
+	p.deafenAllMembers()
 	p.unDeafenAllMembers()
 }
 
@@ -153,13 +160,13 @@ func (p *Pomodoro) Stop() {
 	}
 }
 
-func (p *Pomodoro) AddMember(userID UserID) {
-	p.members[userID] = true
+func (p *Pomodoro) AddMember(user discordgo.User) {
+	p.members[user.ID] = user
 }
 
-func (p *Pomodoro) AddMemberWithServerMute(userID UserID, session *discordgo.Session, guildID GuildID) {
-	session.GuildMemberDeafen(guildID, userID, true)
-	p.AddMember(userID)
+func (p *Pomodoro) AddMemberWithServerMute(user discordgo.User, session *discordgo.Session, guildID GuildID) {
+	session.GuildMemberDeafen(guildID, user.ID, true)
+	p.AddMember(user)
 }
 
 func (p *Pomodoro) RemoveMember(userID UserID, session *discordgo.Session, guildID GuildID) {
@@ -305,14 +312,14 @@ func onVoiceStateUpdate(session *discordgo.Session, updated *discordgo.VoiceStat
 	switch pomodoro.GetStatus() {
 	case PomodoroStatusStop:
 		// Start Pomodoro
+		pomodoro.AddMemberWithServerMute(*user, session, pomodoroVCChannel.GuildID)
 		pomodoro.Start()
-		pomodoro.AddMemberWithServerMute(user.ID, session, pomodoroVCChannel.GuildID)
 	case PomodoroStatusTask:
 		// task中であれば入ってきた人をmute
-		pomodoro.AddMemberWithServerMute(user.ID, session, pomodoroVCChannel.GuildID)
+		pomodoro.AddMemberWithServerMute(*user, session, pomodoroVCChannel.GuildID)
 	case PomodoroStatusBreakTime:
 		// 休憩中であれば入ってきた人を追加するが mute しない
-		pomodoro.AddMember(user.ID)
+		pomodoro.AddMember(*user)
 	}
 
 }
