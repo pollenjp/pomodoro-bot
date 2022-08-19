@@ -112,7 +112,7 @@ func (p *Pomodoro) Task() {
 	msg += fmt.Sprintf("Task time ends at %s.", t.Format("2006/01/02")+" "+t.Format("15:04"))
 	log.Print(msg)
 	p.messageWithAllMembersMention(msg)
-	p.deafenAllMembers()
+	p.muteAndDeafenAllMembers()
 }
 
 func (p *Pomodoro) messageWithAllMembersMention(msg string) {
@@ -150,8 +150,8 @@ func (p *Pomodoro) Break() {
 	msg += fmt.Sprintf("Break time ends at %s.", t.Format("2006/01/02")+" "+t.Format("15:04"))
 	log.Print(msg)
 	p.messageWithAllMembersMention(msg)
-	p.deafenAllMembers()
-	p.unDeafenAllMembers()
+	p.muteAndDeafenAllMembers()
+	p.unMuteAndUnDeafenAllMembers()
 }
 
 func (p *Pomodoro) Stop() {
@@ -162,7 +162,7 @@ func (p *Pomodoro) Stop() {
 	// wait for goroutine to finish
 	p.wg.Wait()
 
-	p.unDeafenAllMembers()
+	p.unMuteAndUnDeafenAllMembers()
 
 	msg := "Pomodoro is over!\n"
 	msg += "If you want to get out from the pomodoro VC while tasking and deaf, move to another VC from pomodoro's.\n"
@@ -189,25 +189,29 @@ func (p *Pomodoro) AddMember(user discordgo.User) {
 
 }
 
-func (p *Pomodoro) AddMemberWithServerMute(user discordgo.User, session *discordgo.Session, guildID GuildID) {
-	session.GuildMemberDeafen(guildID, user.ID, true)
+func (p *Pomodoro) AddMemberWithServerMuteDeaf(user discordgo.User) {
+	p.session.GuildMemberMute(p.guildID, user.ID, true)
+	p.session.GuildMemberDeafen(p.guildID, user.ID, true)
 	p.AddMember(user)
 }
 
-func (p *Pomodoro) RemoveMember(userID UserID, session *discordgo.Session, guildID GuildID) {
-	session.GuildMemberDeafen(guildID, userID, false)
+func (p *Pomodoro) RemoveMember(userID UserID) {
+	p.session.GuildMemberMute(p.guildID, userID, false)
+	p.session.GuildMemberDeafen(p.guildID, userID, false)
 	delete(p.members, userID)
 	log.Printf("Removed member: %s", userID)
 }
 
-func (p *Pomodoro) deafenAllMembers() {
+func (p *Pomodoro) muteAndDeafenAllMembers() {
 	for userID := range p.members {
+		p.session.GuildMemberMute(p.guildID, userID, true)
 		p.session.GuildMemberDeafen(p.guildID, userID, true)
 	}
 }
 
-func (p *Pomodoro) unDeafenAllMembers() {
+func (p *Pomodoro) unMuteAndUnDeafenAllMembers() {
 	for userID := range p.members {
+		p.session.GuildMemberMute(p.guildID, userID, false)
 		p.session.GuildMemberDeafen(p.guildID, userID, false)
 	}
 }
@@ -325,7 +329,7 @@ func onVoiceStateUpdate(session *discordgo.Session, updated *discordgo.VoiceStat
 	if isJoin {
 		defer unlockPomodoro(pomodoroVCChannel.ID)
 	} else {
-		pomodoro.RemoveMember(user.ID, session, pomodoroVCChannel.GuildID)
+		pomodoro.RemoveMember(user.ID)
 		if len(pomodoro.members) == 0 {
 			defer releasePomodoroWithUnlock(pomodoroVCChannel.ID)
 		} else {
@@ -337,11 +341,11 @@ func onVoiceStateUpdate(session *discordgo.Session, updated *discordgo.VoiceStat
 	switch pomodoro.GetStatus() {
 	case PomodoroStatusStop:
 		// Start Pomodoro
-		pomodoro.AddMemberWithServerMute(*user, session, pomodoroVCChannel.GuildID)
+		pomodoro.AddMemberWithServerMuteDeaf(*user)
 		pomodoro.Start()
 	case PomodoroStatusTask:
 		// task中であれば入ってきた人をmute
-		pomodoro.AddMemberWithServerMute(*user, session, pomodoroVCChannel.GuildID)
+		pomodoro.AddMemberWithServerMuteDeaf(*user)
 	case PomodoroStatusBreakTime:
 		// 休憩中であれば入ってきた人を追加するが mute しない
 		pomodoro.AddMember(*user)
