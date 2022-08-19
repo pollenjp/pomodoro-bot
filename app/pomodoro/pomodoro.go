@@ -108,7 +108,7 @@ func (p *Pomodoro) Task() {
 	msg += "\n"
 	msg += fmt.Sprintf("Task time ends in %d minutes.", PomodoroTaskMinutes)
 	msg += "\n"
-	t := time.Now().Add(PomodoroBreakMinutes * time.Minute)
+	t := time.Now().Add(PomodoroTaskMinutes * time.Minute)
 	msg += fmt.Sprintf("Task time ends at %s.", t.Format("2006/01/02")+" "+t.Format("15:04"))
 	log.Print(msg)
 	p.messageWithAllMembersMention(msg)
