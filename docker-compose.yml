@@ -1,0 +1,9 @@
+services:
+  prod:
+    container_name: prod
+    image: 'pollenjp/pomodoro-bot:latest'
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      TZ: Asia/Tokyo

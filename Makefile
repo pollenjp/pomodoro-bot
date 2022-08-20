@@ -13,12 +13,11 @@ endif
 
 .PHONY: debug
 debug:
-	${MAKE} run ENV_FILE=".env"
+	${MAKE} run ENV_FILE=".env.debug"
 
 .PHONY: production
 production:
 	${MAKE} run ENV_FILE=".env.production"
-
 
 .PHONY: run-bin
 run-bin:
@@ -26,7 +25,6 @@ ifndef ENV_FILE
 	exit 1
 endif
 	env $$(cat ${ENV_FILE} | xargs) ./pomodoro-bot
-
 
 .PHONY: production-bin
 production-bin:
@@ -36,3 +34,8 @@ production-bin:
 	fi
 	tar -xvf pomodoro-bot.tar.gz
 	${MAKE} run-bin ENV_FILE=".env.production"
+
+.PHONY: docker
+docker:
+	docker-compose build
+	docker push pollenjp/pomodoro-bot:latest
