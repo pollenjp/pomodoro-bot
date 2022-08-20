@@ -37,5 +37,5 @@ production-bin:
 
 .PHONY: docker
 docker:
-	docker-compose build
+	docker-compose build --no-cache
 	docker push pollenjp/pomodoro-bot:latest
