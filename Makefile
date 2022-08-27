@@ -1,6 +1,6 @@
 ENV_FILE :=
 SHELL := /bin/bash
-PRODUCTION_BIN_VERSION := 0.0.0
+PRODUCTION_BIN_VERSION := 0.0.1
 
 export
 
@@ -39,3 +39,9 @@ production-bin:
 docker:
 	docker-compose build --no-cache
 	docker push pollenjp/pomodoro-bot:latest
+	docker image inspect pollenjp/pomodoro-bot:latest \
+		--format '{{ (index (split .Id ":") 1) }}' \
+		| xargs -I{} \
+		docker tag \
+			{} pollenjp/pomodoro-bot:v${PRODUCTION_BIN_VERSION}
+	docker push pollenjp/pomodoro-bot:v${PRODUCTION_BIN_VERSION}
