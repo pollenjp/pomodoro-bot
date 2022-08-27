@@ -1,12 +1,13 @@
 package pomodoro
 
 import (
-	"fmt"
 	"log"
 	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/nicksnyder/go-i18n/v2/i18n"
+	"golang.org/x/text/language"
 )
 
 type PomodoroStatus int
@@ -104,12 +105,43 @@ func (p *Pomodoro) Task() {
 		},
 	)
 
-	msg := "Pomodoro task has started!"
+	localizer := i18n.NewLocalizer(I18nBundle, language.Japanese.String())
+	msg := ""
+
+	if m, err := localizer.Localize(&i18n.LocalizeConfig{MessageID: "Start your task!"}); err == nil {
+		msg += m
+	} else {
+		msg += "Start your task!"
+	}
+
 	msg += "\n"
-	msg += fmt.Sprintf("Task time ends in %d minutes.", PomodoroTaskMinutes)
+
+	if m, err := localizer.Localize(&i18n.LocalizeConfig{
+		MessageID: "Task will end in Min minutes.",
+		TemplateData: map[string]interface{}{
+			"Min": PomodoroTaskMinutes,
+		},
+		PluralCount: PomodoroTaskMinutes,
+	}); err == nil {
+		msg += m
+	} else {
+		msg += "Start your task!"
+	}
+
 	msg += "\n"
+
 	t := time.Now().Add(PomodoroTaskMinutes * time.Minute)
-	msg += fmt.Sprintf("Task time ends at %s.", t.Format("2006/01/02")+" "+t.Format("15:04"))
+	if m, err := localizer.Localize(&i18n.LocalizeConfig{
+		MessageID: "The task will end at DateTime.",
+		TemplateData: map[string]interface{}{
+			"DateTime": t.Format("2006/01/02") + " " + t.Format("15:04"),
+		},
+	}); err == nil {
+		msg += m
+	} else {
+		msg += "Start your task!"
+	}
+
 	log.Print(msg)
 	p.messageWithAllMembersMention(msg)
 	p.muteAndDeafenAllMembers()
@@ -142,13 +174,46 @@ func (p *Pomodoro) Break() {
 		},
 	)
 
-	msg := "Pomodoro break time has started!"
+	localizer := i18n.NewLocalizer(I18nBundle, language.Japanese.String())
+
+	msg := ""
+	if m, err := localizer.Localize(&i18n.LocalizeConfig{MessageID: "The break has started!"}); err == nil {
+		msg += m
+	} else {
+		msg += "The break has started!"
+	}
+
 	msg += "\n"
-	msg += fmt.Sprintf("Break time ends in %d minutes.", PomodoroBreakMinutes)
+
+	if m, err := localizer.Localize(&i18n.LocalizeConfig{
+		MessageID: "The break will end in Min minutes",
+		TemplateData: map[string]interface{}{
+			"Min": PomodoroBreakMinutes,
+		},
+		PluralCount: PomodoroBreakMinutes,
+	}); err == nil {
+		msg += m
+	} else {
+		msg += "The break will end in Min minutes"
+	}
+
 	msg += "\n"
+
 	t := time.Now().Add(PomodoroBreakMinutes * time.Minute)
-	msg += fmt.Sprintf("Break time ends at %s.", t.Format("2006/01/02")+" "+t.Format("15:04"))
+
+	if m, err := localizer.Localize(&i18n.LocalizeConfig{
+		MessageID: "The break will end at DateTime.",
+		TemplateData: map[string]interface{}{
+			"DateTime": t.Format("2006/01/02") + " " + t.Format("15:04"),
+		},
+	}); err == nil {
+		msg += m
+	} else {
+		msg += "The break will end at DateTime."
+	}
+
 	log.Print(msg)
+
 	p.messageWithAllMembersMention(msg)
 	p.muteAndDeafenAllMembers()
 	p.unMuteAndUnDeafenAllMembers()
