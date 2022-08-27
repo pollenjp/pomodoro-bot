@@ -186,7 +186,7 @@ func (p *Pomodoro) Break() {
 	msg += "\n"
 
 	if m, err := localizer.Localize(&i18n.LocalizeConfig{
-		MessageID: "The break will end in Min minutes",
+		MessageID: "The break will end in Min minutes.",
 		TemplateData: map[string]interface{}{
 			"Min": PomodoroBreakMinutes,
 		},
