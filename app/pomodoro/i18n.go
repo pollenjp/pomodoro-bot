@@ -54,11 +54,11 @@ func initI18n() {
 				// task
 				"Start your task!":               "タスク開始なのん! ╲(๑˙Δ˙๑)",
 				"Task will end in Min minutes.":  "タスクは{{ .Min }}分間ですん!",
-				"The task will end at DateTime.": "{{ .DateTime }} まで頑張るのん! https://i.gyazo.com/c5e4b87ff10276499a02c164ea58dc96.png",
+				"The task will end at DateTime.": "{{ .DateTime }} まで頑張るのん!\n" + "https://i.gyazo.com/c5e4b87ff10276499a02c164ea58dc96.png",
 				// break
 				"The break has started!":             "休憩なのん ฅ(๑¯Δ¯๑)",
-				"The break will end in Min minutes.": "時間は五分間しかないのんな _(　　_‾ω‾ )_ぐでーん",
-				"The break will end at DateTime.":    "時間は {{ .DateTime }} までなのん c⌒っ_ω_)っぐてーん https://i.gyazo.com/400a0d826b71bccbabf8e92236ef5b4f.png",
+				"The break will end in Min minutes.": "時間は五分間しかないのんな ＿(　　＿‾ω‾ )＿",
+				"The break will end at DateTime.":    "時間は {{ .DateTime }} までなのん c⌒っ＿ω＿)っ\n" + "https://i.gyazo.com/400a0d826b71bccbabf8e92236ef5b4f.png",
 			},
 		},
 	}
