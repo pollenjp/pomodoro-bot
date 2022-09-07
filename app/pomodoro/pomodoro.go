@@ -281,9 +281,25 @@ func (p *Pomodoro) unMuteAndUnDeafenAllMembers() {
 	}
 }
 
+// Add a new user to a pomodoro's member list
+func (p *Pomodoro) AddUser(user discordgo.User) {
+	switch p.GetStatus() {
+	case PomodoroStatusStop:
+		// Start Pomodoro
+		p.AddMemberWithServerMuteDeaf(user)
+		p.Start()
+	case PomodoroStatusTask:
+		// task中であれば入ってきた人をmute
+		p.AddMemberWithServerMuteDeaf(user)
+	case PomodoroStatusBreakTime:
+		// 休憩中であれば入ってきた人を追加するが mute しない
+		p.AddMember(user)
+	}
+}
+
 var (
 	pomodoroMapLock sync.Mutex
-	pomodoroMap     map[ChannelID]*PomodoroWithLock = make(map[ChannelID]*PomodoroWithLock)
+	pomodoroMap     map[GuildID]*PomodoroWithLock = make(map[GuildID]*PomodoroWithLock)
 )
 
 type PomodoroWithLock struct {
@@ -300,32 +316,32 @@ func (pp *PomodoroWithLock) getPomodoro(session *discordgo.Session, guildID Chan
 	return pp.pomo
 }
 
-func getPomodoroWithLock(session *discordgo.Session, guildID ChannelID, vcChannelID ChannelID, textChannelID ChannelID) *Pomodoro {
+func getPomodoroWithLock(session *discordgo.Session, guildID GuildID, textChannelID ChannelID) *Pomodoro {
 	// if empty, create a new Pomodoro
 	pomodoroMapLock.Lock()
-	if pomodoroMap[vcChannelID] == nil {
-		pomodoroMap[vcChannelID] = &PomodoroWithLock{}
+	if pomodoroMap[guildID] == nil {
+		pomodoroMap[guildID] = &PomodoroWithLock{}
 	}
 	pomodoroMapLock.Unlock()
-	return pomodoroMap[vcChannelID].getPomodoro(session, guildID, textChannelID)
+	return pomodoroMap[guildID].getPomodoro(session, guildID, textChannelID)
 }
 
-func unlockPomodoro(channelID ChannelID) {
-	pomodoroMap[channelID].lock.Unlock()
+func unlockPomodoro(guildID GuildID) {
+	pomodoroMap[guildID].lock.Unlock()
 	log.Print("Pomodoro was unlocked!")
 }
 
-func releasePomodoroWithUnlock(channelID ChannelID) {
-	pomodoroWithLock := pomodoroMap[channelID]
+func releasePomodoroWithUnlock(guildID GuildID) {
+	pomodoroWithLock := pomodoroMap[guildID]
 	if pomodoroWithLock == nil {
-		log.Printf("Pomodoro with channelID: %s is not found!", channelID)
+		log.Printf("Pomodoro in Guild ID (%s) is not found!", guildID)
 		return
 	}
 	lock := &pomodoroWithLock.lock
 	if lock.TryLock() {
 		log.Print("Pomodoro was unlocked!?")
 	}
-	defer unlockPomodoro(channelID)
+	defer unlockPomodoro(guildID)
 
 	if pomo := pomodoroWithLock.pomo; pomo != nil {
 		// Stop timer
@@ -334,8 +350,41 @@ func releasePomodoroWithUnlock(channelID ChannelID) {
 		}
 		// release pomodoro
 		pomo = nil
-		log.Printf("Pomodoro for %v was released!", channelID)
+		log.Printf("Pomodoro for %v was released!", guildID)
 	}
+}
+
+func releaseOrUnlockPomodoro(pomodoro *Pomodoro, guildID GuildID) {
+	if pomodoro == nil {
+		log.Printf("Try to release or unlock pomodoro, but pomodoro is nil!")
+		return
+	}
+	if len(pomodoro.members) == 0 {
+		defer releasePomodoroWithUnlock(guildID)
+	} else {
+		defer unlockPomodoro(guildID)
+	}
+}
+
+// 冪等性を持つ Remove User
+// Lock を内部で行う
+func SafeRemoveUserWithLock(guildID GuildID, userID UserID) {
+	pomodoroMapLock.Lock()
+	pomodoroWithLock, ok := pomodoroMap[guildID]
+	if !ok { // ポモドーロが開始していなければ何もしない
+		pomodoroMapLock.Unlock()
+		return
+	}
+	pomodoroMapLock.Unlock()
+
+	pomodoroWithLock.lock.Lock()
+	pomodoro := pomodoroWithLock.pomo
+	defer releaseOrUnlockPomodoro(pomodoro, guildID)
+	if pomodoro == nil { // pomodoro が生成されていなければ何もしない
+		return
+	}
+
+	pomodoro.RemoveMember(userID)
 }
 
 func onVoiceStateUpdate(session *discordgo.Session, updated *discordgo.VoiceStateUpdate) {
@@ -351,6 +400,7 @@ func onVoiceStateUpdate(session *discordgo.Session, updated *discordgo.VoiceStat
 
 	if updated.ChannelID == "" && updated.BeforeUpdate.ChannelID != pomodoroVCChannelID {
 		// 対象チャンネル以外からLeaveしたとき
+		SafeRemoveUserWithLock(updated.GuildID, updated.UserID)
 		return
 	}
 	if updated.BeforeUpdate == nil && updated.ChannelID != pomodoroVCChannelID {
@@ -390,30 +440,12 @@ func onVoiceStateUpdate(session *discordgo.Session, updated *discordgo.VoiceStat
 	}
 	log.Printf("%v", isJoin)
 
-	pomodoro := getPomodoroWithLock(session, pomodoroVCChannel.GuildID, pomodoroVCChannelID, Info.GetChannelIDForNotification())
+	pomodoro := getPomodoroWithLock(session, pomodoroVCChannel.GuildID, Info.GetChannelIDForNotification())
 	if isJoin {
-		defer unlockPomodoro(pomodoroVCChannel.ID)
+		defer unlockPomodoro(pomodoroVCChannel.GuildID)
+		pomodoro.AddUser(*user)
 	} else {
+		defer releaseOrUnlockPomodoro(pomodoro, pomodoroVCChannel.GuildID)
 		pomodoro.RemoveMember(user.ID)
-		if len(pomodoro.members) == 0 {
-			defer releasePomodoroWithUnlock(pomodoroVCChannel.ID)
-		} else {
-			defer unlockPomodoro(pomodoroVCChannel.ID)
-		}
-		return
 	}
-
-	switch pomodoro.GetStatus() {
-	case PomodoroStatusStop:
-		// Start Pomodoro
-		pomodoro.AddMemberWithServerMuteDeaf(*user)
-		pomodoro.Start()
-	case PomodoroStatusTask:
-		// task中であれば入ってきた人をmute
-		pomodoro.AddMemberWithServerMuteDeaf(*user)
-	case PomodoroStatusBreakTime:
-		// 休憩中であれば入ってきた人を追加するが mute しない
-		pomodoro.AddMember(*user)
-	}
-
 }

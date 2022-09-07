@@ -11,6 +11,7 @@ import (
 
 func init() {
 	InitInfo(
+		os.Getenv("GUILD_ID"),
 		os.Getenv("CHANNEL_ID_FOR_NOTIFICATION"),
 		os.Getenv("CHANNEL_ID_FOR_POMODORO_VC"),
 	)
@@ -27,12 +28,36 @@ func init() {
 	session.AddHandler(pingPongMessageHandler)
 	session.AddHandler(onVoiceStateUpdate)
 
+	session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		if h, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
+			h(s, i)
+		}
+	})
+
 	if err = session.Open(); err != nil {
 		panic(err)
 	}
 
+	registeredCommands := make([]*discordgo.ApplicationCommand, len(commands))
+	for i, v := range commands {
+		cmd, err := session.ApplicationCommandCreate(session.State.User.ID, Info.GetGuildID(), v)
+		if err != nil {
+			log.Panicf("Cannot create '%v' command: %v", v.Name, err)
+		}
+		registeredCommands[i] = cmd
+	}
+
 	app.Destructor.Append(
 		func() {
+
+			log.Println("Removing commands...")
+			for _, v := range registeredCommands {
+				err := session.ApplicationCommandDelete(session.State.User.ID, Info.GetGuildID(), v.ID)
+				if err != nil {
+					log.Panicf("Cannot delete '%v' command: %v", v.Name, err)
+				}
+			}
+
 			session.Close()
 		},
 	)
