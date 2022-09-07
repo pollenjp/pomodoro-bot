@@ -1,6 +1,6 @@
 ENV_FILE :=
 SHELL := /bin/bash
-PRODUCTION_BIN_VERSION := 0.0.2
+PRODUCTION_BIN_VERSION := 0.1.0
 
 export
 
