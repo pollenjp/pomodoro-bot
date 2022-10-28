@@ -1,0 +1,27 @@
+name: autolabeler
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - release/*
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  autolabel:
+    permissions:
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: release-drafter/release-drafter@v5
+        with:
+          config-name: release-drafter-autolabel.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,24 @@
+template: |
+  ## Changes
+
+  $CHANGES
+
+autolabeler:
+  - label: bug
+    branch:
+      - '/^fix[/-].+/'
+      - '/^bugfix[/-].+/'
+  - label: documentation
+    branch:
+      - '/doc(umentation)[/-].+/'
+    files:
+      - '*.md'
+  - label: enhancement
+    branch:
+      - '/(enhancement|improve)[/-].+/'
+  - label: feature
+    branch:
+      - '/^feat(ure)?[/-].+/'
+  - label: refactor
+    branch:
+      - '/(refactor|refactoring)[/-].+/'
