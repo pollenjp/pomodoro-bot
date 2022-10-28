@@ -63,6 +63,7 @@ var (
 
 				// VC にいる場合は pomodoro を開始する
 				if pomodoro, err := getPomodoroWithLock(s, i.GuildID, Info.GetChannelIDForNotification()); err != nil {
+					log.Println(err)
 					return
 				} else {
 					defer unlockPomodoro(Info.GetGuildID())
@@ -89,6 +90,7 @@ var (
 
 				// pomodoro を停止
 				if pomodoro, err := getPomodoroWithLock(s, i.GuildID, Info.GetChannelIDForNotification()); err != nil {
+					log.Println(err)
 					return
 				} else {
 					defer releaseOrUnlockPomodoro(pomodoro, i.GuildID)
