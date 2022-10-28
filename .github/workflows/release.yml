@@ -30,12 +30,16 @@ jobs:
         id: version
         run: |
           version=$(head -n 1 < version.txt | tr -d '\n')
-          echo "::set-output name=version::${version}"
+          echo "version_tag=${version}" >> $GITHUB_ENV
 
       - name: tag check
         run: |
-          git tag v${{ steps.version.outputs.version }}
-          git push origin v${{ steps.version.outputs.version }}
+          if $(git fetch origin "refs/tags/v${{ env.version_tag }}"); then
+            echo "${{ env.version_tag }} tag already exists!" >&2
+            exit 1
+          fi
+          git tag v${{ env.version_tag }}
+          git push origin v${{ env.version_tag }}
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v3
@@ -67,7 +71,7 @@ jobs:
         id: version
         run: |
           version=$(head -n 1 < version.txt | tr -d '\n')
-          echo "::set-output name=version::${version}"
+          echo "version_tag=${version}" >> $GITHUB_ENV
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
@@ -84,4 +88,4 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest
-            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ env.version_tag }}

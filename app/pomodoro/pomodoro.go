@@ -1,7 +1,6 @@
 package pomodoro
 
 import (
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -49,19 +48,16 @@ func NewPomodoro(session *discordgo.Session, guildID ChannelID, textChannelID Ch
 
 	taskDuration, err := time.ParseDuration(PomodoroTaskDuration)
 	if err != nil {
-		fmt.Errorf("Error parsing PomodoroTaskDuration (%v): %v", PomodoroTaskDuration, err)
 		return nil, err
 	}
 
 	breakDuration, err := time.ParseDuration(PomodoroBreakDuration)
 	if err != nil {
-		fmt.Errorf("Error parsing PomodoroBreakDuration (%v): %v", PomodoroBreakDuration, err)
 		return nil, err
 	}
 
 	warningEndBreakDuration, err := time.ParseDuration(PomodoroWarningEndBreakDuration)
 	if err != nil {
-		fmt.Errorf("Error parsing PomodoroWarningEndBreakDuration (%v): %v", PomodoroWarningEndBreakDuration, err)
 		return nil, err
 	}
 
@@ -363,7 +359,6 @@ func (pp *PomodoroWithLock) getPomodoro(session *discordgo.Session, guildID Chan
 		var err error
 		if pp.pomo, err = NewPomodoro(session, guildID, textChannelID); err != nil {
 			pp.lock.Unlock()
-			fmt.Errorf("Error creating Pomodoro: %v", err)
 			return nil, err
 		}
 	}
@@ -495,6 +490,7 @@ func onVoiceStateUpdate(session *discordgo.Session, updated *discordgo.VoiceStat
 	log.Printf("%v", isJoin)
 
 	if pomodoro, err := getPomodoroWithLock(session, pomodoroVCChannel.GuildID, Info.GetChannelIDForNotification()); err != nil {
+		log.Println(err)
 		return
 	} else {
 		if isJoin {
