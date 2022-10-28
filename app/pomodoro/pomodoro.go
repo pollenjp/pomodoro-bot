@@ -20,8 +20,9 @@ const (
 )
 
 const (
-	PomodoroTaskDuration  = "25m"
-	PomodoroBreakDuration = "5m"
+	PomodoroTaskDuration            = "25m"
+	PomodoroBreakDuration           = "5m"
+	PomodoroWarningEndBreakDuration = "10s"
 )
 
 // Start() でスタート
@@ -32,15 +33,16 @@ type Pomodoro struct {
 	guildID       ChannelID
 	textChannelID ChannelID
 	// Joining users
-	members         map[UserID]discordgo.User
-	status          PomodoroStatus `default:"PomodoroStatusStop"`
-	taskDuration    time.Duration
-	breakDuration   time.Duration
-	timer           *time.Timer
-	taskEndTimerCh  chan struct{}
-	breakEndTimerCh chan struct{}
-	stopCh          chan struct{}
-	wg              sync.WaitGroup
+	members                 map[UserID]discordgo.User
+	status                  PomodoroStatus `default:"PomodoroStatusStop"`
+	taskDuration            time.Duration
+	breakDuration           time.Duration
+	warningEndBreakDuration time.Duration
+	timer                   *time.Timer
+	taskEndTimerCh          chan struct{}
+	breakEndTimerCh         chan struct{}
+	stopCh                  chan struct{}
+	wg                      sync.WaitGroup
 }
 
 func NewPomodoro(session *discordgo.Session, guildID ChannelID, textChannelID ChannelID) (*Pomodoro, error) {
@@ -57,14 +59,21 @@ func NewPomodoro(session *discordgo.Session, guildID ChannelID, textChannelID Ch
 		return nil, err
 	}
 
+	warningEndBreakDuration, err := time.ParseDuration(PomodoroWarningEndBreakDuration)
+	if err != nil {
+		fmt.Errorf("Error parsing PomodoroWarningEndBreakDuration (%v): %v", PomodoroWarningEndBreakDuration, err)
+		return nil, err
+	}
+
 	return &Pomodoro{
-		session:       session,
-		guildID:       guildID,
-		textChannelID: textChannelID,
-		members:       make(map[UserID]discordgo.User),
-		status:        PomodoroStatusStop,
-		taskDuration:  taskDuration,
-		breakDuration: breakDuration,
+		session:                 session,
+		guildID:                 guildID,
+		textChannelID:           textChannelID,
+		members:                 make(map[UserID]discordgo.User),
+		status:                  PomodoroStatusStop,
+		taskDuration:            taskDuration,
+		breakDuration:           breakDuration,
+		warningEndBreakDuration: warningEndBreakDuration,
 	}, nil
 
 }
@@ -186,14 +195,34 @@ func (p *Pomodoro) Break() {
 		p.timer.Stop()
 	}
 
+	localizer := i18n.NewLocalizer(I18nBundle, language.Japanese.String())
+
 	p.timer = time.AfterFunc(
-		p.breakDuration,
+		p.breakDuration-p.warningEndBreakDuration,
 		func() {
-			p.breakEndTimerCh <- struct{}{}
+			time.AfterFunc(
+				p.warningEndBreakDuration,
+				func() {
+					p.breakEndTimerCh <- struct{}{}
+				},
+			)
+
+			// send message to all members
+			var msg string
+			messageID := "The break time will end soon!"
+			if m, err := localizer.Localize(&i18n.LocalizeConfig{
+				MessageID: messageID,
+				TemplateData: map[string]interface{}{
+					"Duration": PomodoroWarningEndBreakDuration,
+				},
+			}); err == nil {
+				msg += m
+			} else {
+				msg += messageID
+			}
+			p.messageWithAllMembersMention(msg)
 		},
 	)
-
-	localizer := i18n.NewLocalizer(I18nBundle, language.Japanese.String())
 
 	msg := ""
 	if m, err := localizer.Localize(&i18n.LocalizeConfig{MessageID: "The break has started!"}); err == nil {

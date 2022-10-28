@@ -47,6 +47,7 @@ func initI18n() {
 					"other": "The break will end in {{ .Min }} minutes.",
 				},
 				"The break will end at DateTime.": "The break will end at DateTime.",
+				"The break time will end soon!":   "The break time will end soon! ({{ .Duration }} later)",
 			},
 		},
 		language.Japanese: {
@@ -59,6 +60,7 @@ func initI18n() {
 				"The break has started!":             "休憩なのん ฅ(๑¯Δ¯๑)",
 				"The break will end in Min minutes.": "時間は五分間しかないのんな ＿(　　＿‾ω‾ )＿",
 				"The break will end at DateTime.":    "時間は {{ .DateTime }} までなのん c⌒っ＿ω＿)っ\n" + "https://i.gyazo.com/400a0d826b71bccbabf8e92236ef5b4f.png",
+				"The break time will end soon!":      "あと {{ .Duration }} で休憩時間が終わるのんな (　´･ω･)σ",
 			},
 		},
 	}
