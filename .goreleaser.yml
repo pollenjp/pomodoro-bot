@@ -6,8 +6,6 @@ before:
     - go mod tidy
     # you may remove this if you don't need go generate
     # - go generate ./...
-    # licenses
-    - make license
 builds:
   - env:
       - CGO_ENABLED=0
