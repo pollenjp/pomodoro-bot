@@ -62,9 +62,12 @@ var (
 				log.Printf("User is in voice channel: %v", voiceState.ChannelID)
 
 				// VC にいる場合は pomodoro を開始する
-				pomodoro := getPomodoroWithLock(s, i.GuildID, Info.GetChannelIDForNotification())
-				defer unlockPomodoro(Info.GetGuildID())
-				pomodoro.AddUser(*user)
+				if pomodoro, err := getPomodoroWithLock(s, i.GuildID, Info.GetChannelIDForNotification()); err != nil {
+					return
+				} else {
+					defer unlockPomodoro(Info.GetGuildID())
+					pomodoro.AddUser(*user)
+				}
 			case "stop":
 				user := i.Member.User
 				content = fmt.Sprintf("Bye %s! See <#%s>!", user.Username, Info.GetChannelIDForNotification())
@@ -85,9 +88,12 @@ var (
 				}
 
 				// pomodoro を停止
-				pomodoro := getPomodoroWithLock(s, i.GuildID, Info.GetChannelIDForNotification())
-				defer releaseOrUnlockPomodoro(pomodoro, i.GuildID)
-				pomodoro.RemoveMember(user.ID)
+				if pomodoro, err := getPomodoroWithLock(s, i.GuildID, Info.GetChannelIDForNotification()); err != nil {
+					return
+				} else {
+					defer releaseOrUnlockPomodoro(pomodoro, i.GuildID)
+					pomodoro.RemoveMember(user.ID)
+				}
 			default:
 			}
 

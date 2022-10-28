@@ -1,6 +1,7 @@
 package pomodoro
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -19,8 +20,8 @@ const (
 )
 
 const (
-	PomodoroTaskMinutes  = 25
-	PomodoroBreakMinutes = 5
+	PomodoroTaskDuration  = "25m"
+	PomodoroBreakDuration = "5m"
 )
 
 // Start() でスタート
@@ -33,6 +34,8 @@ type Pomodoro struct {
 	// Joining users
 	members         map[UserID]discordgo.User
 	status          PomodoroStatus `default:"PomodoroStatusStop"`
+	taskDuration    time.Duration
+	breakDuration   time.Duration
 	timer           *time.Timer
 	taskEndTimerCh  chan struct{}
 	breakEndTimerCh chan struct{}
@@ -40,14 +43,29 @@ type Pomodoro struct {
 	wg              sync.WaitGroup
 }
 
-func NewPomodoro(session *discordgo.Session, guildID ChannelID, textChannelID ChannelID) *Pomodoro {
+func NewPomodoro(session *discordgo.Session, guildID ChannelID, textChannelID ChannelID) (*Pomodoro, error) {
+
+	taskDuration, err := time.ParseDuration(PomodoroTaskDuration)
+	if err != nil {
+		fmt.Errorf("Error parsing PomodoroTaskDuration (%v): %v", PomodoroTaskDuration, err)
+		return nil, err
+	}
+
+	breakDuration, err := time.ParseDuration(PomodoroBreakDuration)
+	if err != nil {
+		fmt.Errorf("Error parsing PomodoroBreakDuration (%v): %v", PomodoroBreakDuration, err)
+		return nil, err
+	}
+
 	return &Pomodoro{
 		session:       session,
 		guildID:       guildID,
 		textChannelID: textChannelID,
 		members:       make(map[UserID]discordgo.User),
 		status:        PomodoroStatusStop,
-	}
+		taskDuration:  taskDuration,
+		breakDuration: breakDuration,
+	}, nil
 
 }
 
@@ -99,7 +117,7 @@ func (p *Pomodoro) Task() {
 	}
 
 	p.timer = time.AfterFunc(
-		time.Duration(PomodoroTaskMinutes)*time.Minute,
+		p.taskDuration,
 		func() {
 			p.taskEndTimerCh <- struct{}{}
 		},
@@ -116,12 +134,13 @@ func (p *Pomodoro) Task() {
 
 	msg += "\n"
 
+	d := int(p.taskDuration.Minutes())
 	if m, err := localizer.Localize(&i18n.LocalizeConfig{
 		MessageID: "Task will end in Min minutes.",
 		TemplateData: map[string]interface{}{
-			"Min": PomodoroTaskMinutes,
+			"Min": d,
 		},
-		PluralCount: PomodoroTaskMinutes,
+		PluralCount: d,
 	}); err == nil {
 		msg += m
 	} else {
@@ -130,7 +149,7 @@ func (p *Pomodoro) Task() {
 
 	msg += "\n"
 
-	t := time.Now().Add(PomodoroTaskMinutes * time.Minute)
+	t := time.Now().Add(p.taskDuration)
 	if m, err := localizer.Localize(&i18n.LocalizeConfig{
 		MessageID: "The task will end at DateTime.",
 		TemplateData: map[string]interface{}{
@@ -168,7 +187,7 @@ func (p *Pomodoro) Break() {
 	}
 
 	p.timer = time.AfterFunc(
-		time.Duration(PomodoroBreakMinutes)*time.Minute,
+		p.breakDuration,
 		func() {
 			p.breakEndTimerCh <- struct{}{}
 		},
@@ -185,12 +204,13 @@ func (p *Pomodoro) Break() {
 
 	msg += "\n"
 
+	d := int(p.breakDuration.Minutes())
 	if m, err := localizer.Localize(&i18n.LocalizeConfig{
 		MessageID: "The break will end in Min minutes.",
 		TemplateData: map[string]interface{}{
-			"Min": PomodoroBreakMinutes,
+			"Min": d,
 		},
-		PluralCount: PomodoroBreakMinutes,
+		PluralCount: d,
 	}); err == nil {
 		msg += m
 	} else {
@@ -199,7 +219,7 @@ func (p *Pomodoro) Break() {
 
 	msg += "\n"
 
-	t := time.Now().Add(PomodoroBreakMinutes * time.Minute)
+	t := time.Now().Add(p.breakDuration)
 
 	if m, err := localizer.Localize(&i18n.LocalizeConfig{
 		MessageID: "The break will end at DateTime.",
@@ -307,16 +327,21 @@ type PomodoroWithLock struct {
 	lock sync.Mutex
 }
 
-func (pp *PomodoroWithLock) getPomodoro(session *discordgo.Session, guildID ChannelID, textChannelID ChannelID) *Pomodoro {
+func (pp *PomodoroWithLock) getPomodoro(session *discordgo.Session, guildID ChannelID, textChannelID ChannelID) (*Pomodoro, error) {
 	pp.lock.Lock()
 	log.Print("Pomodoro was locked!")
 	if pp.pomo == nil {
-		pp.pomo = NewPomodoro(session, guildID, textChannelID)
+		var err error
+		if pp.pomo, err = NewPomodoro(session, guildID, textChannelID); err != nil {
+			pp.lock.Unlock()
+			fmt.Errorf("Error creating Pomodoro: %v", err)
+			return nil, err
+		}
 	}
-	return pp.pomo
+	return pp.pomo, nil
 }
 
-func getPomodoroWithLock(session *discordgo.Session, guildID GuildID, textChannelID ChannelID) *Pomodoro {
+func getPomodoroWithLock(session *discordgo.Session, guildID GuildID, textChannelID ChannelID) (*Pomodoro, error) {
 	// if empty, create a new Pomodoro
 	pomodoroMapLock.Lock()
 	if pomodoroMap[guildID] == nil {
@@ -440,12 +465,15 @@ func onVoiceStateUpdate(session *discordgo.Session, updated *discordgo.VoiceStat
 	}
 	log.Printf("%v", isJoin)
 
-	pomodoro := getPomodoroWithLock(session, pomodoroVCChannel.GuildID, Info.GetChannelIDForNotification())
-	if isJoin {
-		defer unlockPomodoro(pomodoroVCChannel.GuildID)
-		pomodoro.AddUser(*user)
+	if pomodoro, err := getPomodoroWithLock(session, pomodoroVCChannel.GuildID, Info.GetChannelIDForNotification()); err != nil {
+		return
 	} else {
-		defer releaseOrUnlockPomodoro(pomodoro, pomodoroVCChannel.GuildID)
-		pomodoro.RemoveMember(user.ID)
+		if isJoin {
+			defer unlockPomodoro(pomodoroVCChannel.GuildID)
+			pomodoro.AddUser(*user)
+		} else {
+			defer releaseOrUnlockPomodoro(pomodoro, pomodoroVCChannel.GuildID)
+			pomodoro.RemoveMember(user.ID)
+		}
 	}
 }
